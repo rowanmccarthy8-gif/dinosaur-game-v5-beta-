@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>🦖 Dinosaur Game v5.1</title>
+
+<style>
+body{
+margin:0;
+overflow:hidden;
+font-family:Arial;
+background:#111;
+color:white;
+}
+
+canvas{display:block;}
+
+.screen{
+position:absolute;
+width:100%;
+height:100%;
+display:none;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+background:#222;
+}
+
+#menu{display:flex;}
+
+button{
+padding:10px 20px;
+margin:5px;
+font-size:16px;
+cursor:pointer;
+}
+
+.panel{
+position:absolute;
+top:0;
+right:0;
+width:340px;
+height:100%;
+background:rgba(0,0,0,0.85);
+padding:10px;
+overflow:auto;
+display:none;
+}
+
+#ui{
+position:absolute;
+top:10px;
+left:10px;
+background:rgba(0,0,0,0.5);
+padding:10px;
+border-radius:10px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- MENU -->
+<div id="menu" class="screen">
+<h1>🦖 Dinosaur Game v5.1</h1>
+
+<button onclick="startGame()">▶ Play</button>
+<button onclick="openPanel('modPanel')">🤖 AI Mod Maker</button>
+<button onclick="openPanel('pixelPanel')">🎨 Pixel Art</button>
+<button onclick="openPanel('aiPanel')">🖼️ AI Pixel Generator</button>
+<button onclick="openPanel('shopPanel')">🛒 Shop</button>
+</div>
+
+<!-- GAME -->
+<div id="gameScreen" class="screen">
+<canvas id="game"></canvas>
+
+<div id="ui">
+🍎 XP: <span id="xp">0</span><br>
+📈 Level: <span id="level">1</span><br>
+🦖 Form: <span id="form">Egg</span><br>
+👥 Dummies: <span id="count">0</span><br>
+
+<button onclick="spawnDummy()">➕ Spawn Dummy</button>
+<button onclick="pauseGame()">⏸ Pause</button>
+<button onclick="backToMenu()">🏠 Menu</button>
+</div>
+</div>
+
+<!-- PAUSE -->
+<div id="pauseScreen" class="screen">
+<h1>⏸ Paused</h1>
+<button onclick="resumeGame()">▶ Resume</button>
+<button onclick="backToMenu()">🏠 Menu</button>
+</div>
+
+<!-- AI MOD MAKER -->
+<div id="modPanel" class="panel">
+<button onclick="closePanels()">❌ Close</button>
+<h2>🤖 AI Mod Maker</h2>
+
+<textarea id="aiInput" rows="4"
+placeholder="Example:
+spawn 3 dinos and speed"></textarea>
+
+<br><br>
+<button onclick="generateMod()">✨ Generate</button>
+<button onclick="runMod()">▶ Run Mod</button>
+
+<br><br>
+<textarea id="modCode" rows="10"></textarea>
+</div>
+
+<!-- PIXEL ART -->
+<div id="pixelPanel" class="panel">
+<button onclick="closePanels()">❌ Close</button>
+<h2>🎨 Pixel Art</h2>
+<canvas id="pixelCanvas" width="128" height="128"></canvas>
+</div>
+
+<!-- AI PIXEL -->
+<div id="aiPanel" class="panel">
+<button onclick="closePanels()">❌ Close</button>
+<h2>🖼️ AI Pixel Generator</h2>
+<input type="file" id="imgInput"><br><br>
+<canvas id="aiCanvas" width="128" height="128"></canvas>
+</div>
+
+<!-- SHOP -->
+<div id="shopPanel" class="panel">
+<button onclick="closePanels()">❌ Close</button>
+<h2>🛒 Shop</h2>
+<p>Coming soon</p>
+</div>
+
+<script>
+
+// ================= SCREEN SYSTEM =================
+function show(screen){
+document.querySelectorAll(".screen").forEach(s=>s.style.display="none");
+document.querySelectorAll(".panel").forEach(p=>p.style.display="none");
+screen.style.display="flex";
+}
+
+function openPanel(id){
+document.querySelectorAll(".panel").forEach(p=>p.style.display="none");
+document.getElementById(id).style.display="block";
+}
+
+function closePanels(){
+document.querySelectorAll(".panel").forEach(p=>p.style.display="none");
+}
+
+// ================= STATE =================
+let state="menu";
+
+function startGame(){state="game";show(gameScreen);}
+function pauseGame(){state="pause";show(pauseScreen);}
+function resumeGame(){state="game";show(gameScreen);}
+function backToMenu(){state="menu";show(menu);}
+
+// ================= CANVAS =================
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+// ================= PLAYER =================
+let player={
+x:0,y:0,
+size:20,
+speed:4
+};
+
+// INPUT
+let keys={};
+document.addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
+document.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+
+// ================= XP =================
+let xp=0;
+let level=1;
+
+// ================= APPLES =================
+let apples=[];
+function spawnApple(){
+apples.push({x:Math.random()*3000-1500,y:Math.random()*3000-1500});
+}
+for(let i=0;i<25;i++)spawnApple();
+
+// ================= DUMMIES =================
+let dummies=[];
+function spawnDummy(){
+dummies.push({
+x:player.x + Math.random()*200-100,
+y:player.y + Math.random()*200-100,
+size:player.size
+});
+updateUI();
+}
+
+// ================= FORM =================
+function form(){
+if(level<2) return "Egg";
+if(level<4) return "Baby";
+if(level<7) return "Raptor";
+if(level<11) return "T-Rex";
+return "Titan";
+}
+
+// ================= UI =================
+function updateUI(){
+document.getElementById("xp").innerText=xp;
+document.getElementById("level").innerText=level;
+document.getElementById("form").innerText=form();
+document.getElementById("count").innerText=dummies.length;
+}
+
+// ================= UPDATE =================
+function update(){
+if(state!=="game")return;
+
+if(keys["w"])player.y-=player.speed;
+if(keys["s"])player.y+=player.speed;
+if(keys["a"])player.x-=player.speed;
+if(keys["d"])player.x+=player.speed;
+
+for(let i=apples.length-1;i>=0;i--){
+let a=apples[i];
+let d=Math.hypot(player.x-a.x,player.y-a.y);
+
+if(d<20){
+apples.splice(i,1);
+xp+=10;
+spawnApple();
+
+if(xp>=level*60){
+xp=0;
+level++;
+player.size+=2;
+}
+}
+}
+
+updateUI();
+}
+
+// ================= DINOSAUR DRAW =================
+function drawDino(x,y,s,color){
+ctx.fillStyle=color;
+
+ctx.fillRect(x,y,s,s*0.6); // body
+ctx.fillRect(x+s*0.8,y-s*0.2,s*0.5,s*0.4); // head
+ctx.fillRect(x-s*0.5,y+s*0.1,s*0.5,s*0.2); // tail
+ctx.fillRect(x+s*0.1,y+s*0.6,s*0.2,s*0.4); // leg
+ctx.fillRect(x+s*0.5,y+s*0.6,s*0.2,s*0.4); // leg
+}
+
+// ================= DRAW =================
+function draw(){
+if(state!=="game")return;
+
+ctx.fillStyle="#7ec850";
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ctx.save();
+ctx.translate(canvas.width/2-player.x,canvas.height/2-player.y);
+
+ctx.fillStyle="red";
+for(let a of apples){
+ctx.beginPath();
+ctx.arc(a.x,a.y,10,0,Math.PI*2);
+ctx.fill();
+}
+
+for(let d of dummies){
+drawDino(d.x,d.y,d.size,"rgba(0,255,0,0.5)");
+}
+
+drawDino(player.x,player.y,player.size,"#2ecc71");
+
+ctx.restore();
+}
+
+// ================= LOOP =================
+function loop(){
+update();
+draw();
+requestAnimationFrame(loop);
+}
+loop();
+
+// ================= AI MOD MAKER =================
+function generateMod(){
+let input=document.getElementById("aiInput").value.toLowerCase();
+let output="";
+let count=1;
+
+if(input.includes("3")) count=3;
+if(input.includes("5")) count=5;
+
+if(input.includes("spawn")){
+for(let i=0;i<count;i++){
+output+="spawn dummy dino\n";
+}
+}
+
+if(input.includes("speed")) output+="speed +1\n";
+if(input.includes("xp")) output+="xp +20\n";
+
+document.getElementById("modCode").value=output;
+}
+
+// ================= RUN MOD =================
+function runMod(){
+let lines=document.getElementById("modCode").value.split("\n");
+
+for(let line of lines){
+if(line.includes("xp")) xp+=20;
+if(line.includes("speed")) player.speed+=1;
+if(line.includes("spawn dummy dino")) spawnDummy();
+}
+}
+
+// ================= AI PIXEL =================
+const aiCanvas=document.getElementById("aiCanvas");
+const aictx=aiCanvas.getContext("2d");
+
+document.getElementById("imgInput").addEventListener("change",e=>{
+let img=new Image();
+img.onload=()=>{
+aictx.clearRect(0,0,128,128);
+aictx.drawImage(img,0,0,32,32);
+aictx.imageSmoothingEnabled=false;
+aictx.drawImage(aiCanvas,0,0,32,32,0,0,128,128);
+};
+img.src=URL.createObjectURL(e.target.files[0]);
+});
+
+</script>
+
+</body>
+</html>
